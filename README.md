@@ -98,6 +98,7 @@ All parameters are stored in `params.json`.
 ### Example
 
 ![Tracking example](./images/tracking.png)
+![Tracking video](./images/tracking-video.gif)
 
 ## KITTI Segmentation (In development)
 
