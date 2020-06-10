@@ -1,0 +1,41 @@
+{
+    "kitti_detection_root": "/data/sets/kitti_second",
+    "kitti_tracking_root": "/data/sets/kitti_tracking",
+    "kitti_segmentation_root": "/data/sets/kitti_segmentation",
+    "selected_split": "training",
+
+    "compare_results_detection": {
+
+        "root": "/data/sets/kitti_results_detection",
+        "methods": [
+
+            {
+                "name": "method1",
+                "color": [1.0, 0.0, 1.0]
+            },
+            {
+                "name": "method2",
+                "color": [1.0, 1.0, 0.0]
+            },
+            {
+                "name": "method3",
+                "color": [0.0, 0.0, 1.0]
+            }
+        ]
+    },
+
+    "folders": {
+        "detection": {
+            "calib": "calib",
+            "image": "image_2",
+            "label": "label_2",
+            "velodyne": "velodyne"
+        },
+        "tracking": {
+            "calib": "calib",
+            "image": "image_02",
+            "label": "label_02",
+            "velodyne": "velodyne"
+        }
+    }
+}
