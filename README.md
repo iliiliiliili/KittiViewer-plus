@@ -3,7 +3,7 @@
 This is an upgrade of [Second.KittiViewer](https://github.com/traveller59/second.pytorch#try-kitti-viewer-deprecated)
 
 - Works on raw KITTI data (without `second` preprocessing)
-- Allows to compare results of different networks (results must be saved in KITTI format)
+- Allows to compare results of different methods (results must be saved in KITTI format)
 - Allows to display segmentation of points
 
 ## Install Dependencies
@@ -97,7 +97,7 @@ All parameters are stored in `params.json`.
     ```
 ### Example
 
-![Detection example](./images/tracking.png)
+![Tracking example](./images/tracking.png)
 
 ## KITTI Segmentation (In development)
 
@@ -109,4 +109,4 @@ All parameters are stored in `params.json`.
 
 ### Example
 
-![Detection example](./images/segmentation.png)
+![Segmentation example](./images/segmentation.png)
