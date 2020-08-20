@@ -24,6 +24,23 @@
         ]
     },
 
+    "compare_results_tracking": {
+
+        "root": "/data/sets/kitti_results_tracking",
+        "format": "ab3dmot",
+        "methods": [
+
+            {
+                "name": "model1",
+                "color": [0.0, 0.0, 1.0]
+            },
+            {
+                "name": "model2",
+                "color": [0.0, 1.0, 0.0]
+            }
+        ]
+    },
+
     "folders": {
         "detection": {
             "calib": "calib",

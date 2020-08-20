@@ -95,6 +95,42 @@ All parameters are stored in `params.json`.
         },
     }
     ```
+
+- `compare_results_tracking` object describes how to display tracking results from different methods. All results must be stored inside the `root` folder and `methods[i]["name"]` subfolder in selected `format`. `color` field describes RGB color of 3d and 2d boxes.
+
+    ```json
+        "compare_results_detection": {
+
+            "root": "/data/sets/kitti_results_detection",
+            "format": "ab3dmot",
+            "methods": [
+
+                {
+                    "name": "method1",
+                    "color": [1.0, 0.0, 1.0]
+                },
+                {
+                    "name": "method2",
+                    "color": [1.0, 1.0, 0.0]
+                },
+                {
+                    "name": "method3",
+                    "color": [0.0, 0.0, 1.0]
+                }
+            ]
+        }
+    ```
+
+- Supported tracking annotations formats:
+    
+    1. `ab3dmot`: comma separated values in order:
+
+
+Frame | Type   | 2D BBOX (x1, y1, x2, y2)       | Score | 3D BBOX (h, w, l, x, y, z, rot_y) | Alpha  | 
+------|:------:|:------------------------------:|:----------:|:---------------------------------:|:-------------:
+ 0    | 2 (car) | 726.4, 173.69, 917.5, 315.1 |  13.85     | 1.56, 1.58, 3.48, 2.57, 1.57, 9.72, -1.56 | -1.82 | 
+
+
 ### Example
 
 ![Tracking example](./images/tracking.png)

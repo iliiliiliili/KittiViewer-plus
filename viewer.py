@@ -1,7 +1,8 @@
 from core import (
     arrays_dict_element, compare_results_detection, compare_results_detection_methods,
+    compare_results_tracking, compare_results_tracking_methods,
     create_detection_kitti_info, create_segmentation_kitti_info,
-    create_tracking_kitti_info, get_compare_detection_annotation,
+    create_tracking_kitti_info, get_compare_detection_annotation, get_compare_tracking_annotation,
     get_kitti_detection_files,
     get_kitti_segmentation_files,
     get_kitti_tracking_files,
@@ -1046,6 +1047,39 @@ class KittiViewer(QMainWindow):
                     self.w_plt.ax, boxes_3d_p2,
                     colors=(color[0], color[1], color[2])
                 )
+
+    def draw_compare_tracking_in_image(self):
+        if self.kitti_info is None:
+            self.error("you must load infos and choose a existing image idx first.")
+            return
+        
+        if compare_results_tracking is None:
+            return
+
+        rect = self.kitti_info["calib/R0_rect"]
+        P2 = self.kitti_info["calib/P2"]
+        Trv2c = self.kitti_info["calib/Tr_velo_to_cam"]
+
+        for compare in self.kitti_info['compare']:
+
+            color = compare['color']
+            names = compare['names']
+            boxes = compare['boxes']
+            method_name = compare['method_name']
+            difficulty = compare['difficulty']
+
+            gt_boxes_camera = box_np_ops.box_lidar_to_camera(boxes, rect, Trv2c)
+            boxes_3d = box_np_ops.center_to_corner_box3d(
+                gt_boxes_camera[:, :3], gt_boxes_camera[:, 3:6], gt_boxes_camera[:, 6]
+            )
+            boxes_3d = boxes_3d.reshape((-1, 3))
+            boxes_3d_p2 = box_np_ops.project_to_image(boxes_3d, P2)
+            boxes_3d_p2 = boxes_3d_p2.reshape([-1, 8, 2])
+            if self.current_image is not None:
+                bbox_plot.draw_3d_bbox_in_ax(
+                    self.w_plt.ax, boxes_3d_p2,
+                    colors=(color[0], color[1], color[2])
+                )
     
     def draw_gt_in_image(self):
         if self.kitti_info is None:
@@ -1174,6 +1208,49 @@ class KittiViewer(QMainWindow):
             return
 
         if compare_results_detection is None:
+            return
+
+        for compare in self.kitti_info['compare']:
+
+            color = compare['color']
+            names = compare['names']
+            boxes = compare['boxes']
+            method_name = compare['method_name']
+            difficulty = compare['difficulty']
+
+            box_color = (color[0], color[1], color[2], self.w_config.get("GTBoxAlpha"))
+            diff = difficulty.tolist()
+            diff_to_name = {-1: "unk", 0: "easy", 1: "moderate", 2: "hard"}
+            diff_names = [diff_to_name[d] for d in diff]
+            label_idx = list(range(names.shape[0]))
+            labels_ = [
+                f"{i}:{l}, {d}" for i, l, d in zip(label_idx, names, diff_names)
+            ]
+            boxes_corners = box_np_ops.center_to_corner_box3d(
+                boxes[:, :3],
+                boxes[:, 3:6],
+                boxes[:, 6],
+                origin=[0.5, 0.5, 0],
+                axis=2,
+            )
+
+            self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
+            if self.w_config.get("DrawGTLabels"):
+                self.w_pc_viewer.labels(
+                    "gt_boxes/labels",
+                    boxes_corners[:, 0, :],
+                    labels_,
+                    GLColor.Green,
+                    15,
+                )
+
+
+    def plot_compare_tracking_boxes_in_pointcloud(self):
+        if self.kitti_info is None:
+            self.error("you must load infos and choose a existing image idx first.")
+            return
+
+        if compare_results_tracking is None:
             return
 
         for compare in self.kitti_info['compare']:
@@ -1417,7 +1494,6 @@ class KittiViewer(QMainWindow):
                     'method_name': method_name,
                 })
 
-
     def load_info_tracking(self, group_idx, image_idx):
 
         if self.kitti_tracking_files is None:
@@ -1487,6 +1563,36 @@ class KittiViewer(QMainWindow):
         if self.w_config.get("EnableAugmentation"):
             self.data_augmentation()
 
+        self.kitti_info['compare'] = []
+
+        if compare_results_tracking is not None:
+
+            for method in compare_results_tracking_methods:
+                method_name = method['name']
+                method_color = method['color']
+                
+                annos = get_compare_tracking_annotation(
+                    method_name, group_idx, image_idx
+                )
+                labels = annos["name"]
+                num_obj = len([n for n in annos["name"] if n != "DontCare"])
+                # print(annos["group_ids"].shape)
+                dims = annos["dimensions"][:num_obj]
+                loc = annos["location"][:num_obj]
+                rots = annos["rotation_y"][:num_obj]
+                difficulty = annos["difficulty"][:num_obj]
+                names = labels[:num_obj]
+                boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1)
+                boxes = box_np_ops.box_camera_to_lidar(boxes_camera, rect, Trv2c)
+
+                self.kitti_info['compare'].append({
+                    'difficulty': difficulty,
+                    'names': names,
+                    'boxes': boxes,
+                    'color': method_color,
+                    'method_name': method_name,
+                })
+
     def load_info_segmentation(self, image_idx):
 
         if self.kitti_segmentation_files is None:
@@ -1539,8 +1645,10 @@ class KittiViewer(QMainWindow):
         self.load_info_tracking(group_idx, image_idx)
         self.plot_image()
         self.draw_gt_in_image()
+        self.draw_compare_tracking_in_image()
         self.w_plt.draw()  # this isn't supported in ubuntu.
         self.plot_pointcloud()
+        self.plot_compare_tracking_boxes_in_pointcloud()
         if self.w_config.get("DrawGTBoxes") or True:
             self.plot_gt_boxes_in_pointcloud()
         if self.w_config.get("DrawVoxels"):

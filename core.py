@@ -24,6 +24,12 @@ if 'compare_results_detection' in kitti_params:
 else:
     compare_results_detection = None
 
+if 'compare_results_tracking' in kitti_params:
+    compare_results_tracking = kitti_params['compare_results_tracking']
+    compare_results_tracking_methods = compare_results_tracking['methods']
+else:
+    compare_results_tracking = None
+
 detection_folders = kitti_params['folders']['detection']
 tracking_folders = kitti_params['folders']['tracking']
 selected_split = kitti_params['selected_split']
@@ -96,6 +102,7 @@ def get_kitti_tracking_files():
             ))
         else:
             groups = os.listdir(path) if os.path.isdir(path) else []
+            groups.sort()
             group_data = []
 
             for group in groups:
@@ -234,3 +241,75 @@ def get_compare_detection_annotation(method, index):
     )
 
     return label
+
+
+def get_compare_tracking_annotation(method, group, index):
+
+    annotation_format = compare_results_tracking['format']
+
+    if annotation_format == "ab3dmot":
+
+        type_by_number = {1:'Pedestrian', 2:'Car', 3:'Cyclist'}
+
+        file_name = (
+            compare_results_tracking['root'] + '/' + method + '/'
+            + selected_split + '/' + '{:04d}'.format(group) + '.txt'
+        )
+
+        lines = []
+
+        if os.path.exists(file_name):
+            lines = read_lines(file_name)
+            selected_lines = []
+
+            for i in range(len(lines)):
+                line = lines[i]
+                elements = line.replace('\n','').split(',')
+
+                if len(elements) <= 1:
+                    continue
+
+                (
+                    id, t, a1, a2, a3, a4,
+                    b, c1, c2, c3, c4, c5, c6,
+                    alpha, beta
+                ) = elements
+
+
+
+                new_elements = [
+                    type_by_number[int(t)],
+                    0,
+                    0,
+                    beta,
+                    a1,
+                    a2,
+                    a3,
+                    a4,
+                    c1,
+                    c2,
+                    c3,
+                    c4,
+                    c5,
+                    c6,
+                    alpha,
+                    b
+                ]
+
+                new_line = " ".join([str(a) for a in new_elements])
+
+                current_index = int(id)
+
+                if index == current_index:
+                    selected_lines.append(new_line)
+
+            
+            lines = selected_lines
+
+        label = get_label_anno(
+            lines
+        )
+
+        return label
+    else:
+        raise ValueError("Unsupported tracking format: " + annotation_format)
