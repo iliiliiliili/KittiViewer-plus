@@ -1353,8 +1353,10 @@ class KittiViewer(QMainWindow):
         point_color = (0.5, 0.5, 0.5) # self.w_config.get("PointColor")[:3]
         point_color = (*point_color, self.w_config.get("PointAlpha"))
         point_color = np.tile(np.array(point_color), [self.points.shape[0], 1])
-        point_color[:, :3] = (color_none + (color_obj - color_none) * self.points[:, -2:-1])
+        # point_color[:, :3] = (color_none + (color_obj - color_none) * self.points[:, -2:-1])
+        point_color[:, :3] = (color_obj * self.points[:, -2:-1] + color_none * (1 - self.points[:, -2:-1]))
         # point_color[:, :3] = (point_color[:, :3] + (color_ground_truth - point_color[:, :3]) * 0.3 * self.points[:, -1:])
+        point_color[:, :3] = (point_color[:, :3] + color_ground_truth * self.points[:, -1:])
 
         # self.w_pc_viewer.reset_camera()
         point_size = np.full(
@@ -1389,7 +1391,7 @@ class KittiViewer(QMainWindow):
                 self.error("Your pointcloud don't contain reflectivity.")
             else:
                 point_color = np.concatenate(
-                    [point_color[:, :3], self.points[:, 3:4] * 0.8 + 0.2], axis=1
+                    [point_color[:, :3], max(self.points[:, 3:4], self.points[:, 4:]) * 0.8 + 0.2], axis=1
                 )
 
         self.w_pc_viewer.scatter(
