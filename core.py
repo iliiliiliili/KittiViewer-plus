@@ -217,6 +217,9 @@ def create_segmentation_kitti_info(file_name: str):
 
     if len(segmented_points.shape) == 1:
         segmented_points = segmented_points.reshape(-1, 1)
+        
+    if len(ground_trurh_points.shape) == 1:
+        ground_trurh_points = ground_trurh_points.reshape(-1, 1)
 
     points = np.concatenate([original_points, segmented_points], axis=-1)
     points = np.concatenate([points, ground_trurh_points], axis=-1)
