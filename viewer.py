@@ -647,8 +647,9 @@ class KittiViewer(QMainWindow):
         next_prev_layout_segmentation.addWidget(self.w_next_segmentation)
 
         self.w_config_gbox_segmentation = QGroupBox("Kitti Segmentation")
+        self.segmentation_element_index_text = QLabel("Element index:")
         layout_segmentation = QFormLayout()
-        layout_segmentation.addRow(QLabel("Element index:"), self.w_imgidx_segmentation)
+        layout_segmentation.addRow(self.segmentation_element_index_text, self.w_imgidx_segmentation)
         layout_segmentation.addRow(self.w_plot_segmentation)
         layout_segmentation.addRow(next_prev_layout_segmentation)
 
@@ -792,6 +793,7 @@ class KittiViewer(QMainWindow):
         else:
             info_len = len(self.kitti_segmentation_files)
             self.current_idx = min(self.current_idx + 1, info_len - 1)
+            self.segmentation_element_index_text.setText("Element index(" + str(info_len) + "):")
         self.w_imgidx_segmentation.setText(str(self.current_idx))
         self.plot_all_segmentation(self.current_idx)
 
