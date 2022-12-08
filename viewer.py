@@ -65,10 +65,10 @@ from second.core.sample_ops import DataBaseSamplerV2
 from second.core.target_assigner import TargetAssigner
 from second.data import kitti_common as kitti
 from glwidget import KittiGLViewWidget
-from second.protos import pipeline_pb2
+# from second.protos import pipeline_pb2
 from second.utils import bbox_plot
 from second.utils.bbox_plot import GLColor
-from second.utils.eval import get_coco_eval_result, get_official_eval_result
+# from second.utils.eval import get_coco_eval_result, get_official_eval_result
 #from second.pytorch.inference import TorchInferenceContext
 from second.utils.progress_bar import list_bar
 
@@ -177,32 +177,32 @@ class Settings:
             self._settings = json.loads(f.read())
 
 
-def _riou3d_shapely(rbboxes1, rbboxes2):
-    N, K = rbboxes1.shape[0], rbboxes2.shape[0]
-    corners1 = box_np_ops.center_to_corner_box2d(
-        rbboxes1[:, :2], rbboxes1[:, 3:5], rbboxes1[:, 6]
-    )
-    corners2 = box_np_ops.center_to_corner_box2d(
-        rbboxes2[:, :2], rbboxes2[:, 3:5], rbboxes2[:, 6]
-    )
-    iou = np.zeros([N, K], dtype=np.float32)
-    for i in range(N):
-        for j in range(K):
-            iw = min(
-                rbboxes1[i, 2] + rbboxes1[i, 5], rbboxes2[j, 2] + rbboxes2[j, 5]
-            ) - max(rbboxes1[i, 2], rbboxes2[j, 2])
-            if iw > 0:
-                p1 = Polygon(corners1[i])
-                p2 = Polygon(corners2[j])
-                inc = p1.intersection(p2).area * iw
-                # inc = p1.intersection(p2).area
-                if inc > 0:
-                    iou[i, j] = inc / (
-                        p1.area * rbboxes1[i, 5] + p2.area * rbboxes2[j, 5] - inc
-                    )
-                    # iou[i, j] = inc / (p1.area + p2.area - inc)
+# def _riou3d_shapely(rbboxes1, rbboxes2):
+#     N, K = rbboxes1.shape[0], rbboxes2.shape[0]
+#     corners1 = box_np_ops.center_to_corner_box2d(
+#         rbboxes1[:, :2], rbboxes1[:, 3:5], rbboxes1[:, 6]
+#     )
+#     corners2 = box_np_ops.center_to_corner_box2d(
+#         rbboxes2[:, :2], rbboxes2[:, 3:5], rbboxes2[:, 6]
+#     )
+#     iou = np.zeros([N, K], dtype=np.float32)
+#     for i in range(N):
+#         for j in range(K):
+#             iw = min(
+#                 rbboxes1[i, 2] + rbboxes1[i, 5], rbboxes2[j, 2] + rbboxes2[j, 5]
+#             ) - max(rbboxes1[i, 2], rbboxes2[j, 2])
+#             if iw > 0:
+#                 p1 = Polygon(corners1[i])
+#                 p2 = Polygon(corners2[j])
+#                 inc = p1.intersection(p2).area * iw
+#                 # inc = p1.intersection(p2).area
+#                 if inc > 0:
+#                     iou[i, j] = inc / (
+#                         p1.area * rbboxes1[i, 5] + p2.area * rbboxes2[j, 5] - inc
+#                     )
+#                     # iou[i, j] = inc / (p1.area + p2.area - inc)
 
-    return iou
+#     return iou
 
 
 def kitti_anno_to_corners(info, annos=None):
@@ -1125,11 +1125,12 @@ class KittiViewer(QMainWindow):
             self.kitti_info, detection_anno
         )
         if self.gt_boxes is not None:
-            iou = _riou3d_shapely(self.gt_boxes, dt_box_lidar)
-            if iou.shape[0] != 0:
-                dt_to_gt_box_iou = iou.max(0)
-            else:
-                dt_to_gt_box_iou = np.zeros([0, 0])
+            iou = 0
+            # iou = _riou3d_shapely(self.gt_boxes, dt_box_lidar)
+            # if iou.shape[0] != 0:
+            #     dt_to_gt_box_iou = iou.max(0)
+            # else:
+            #     dt_to_gt_box_iou = np.zeros([0, 0])
         num_dt = dt_box_lidar.shape[0]
         dt_boxes_corners_cam = box_np_ops.lidar_to_camera(dt_boxes_corners, rect, Trv2c)
         dt_boxes_corners_cam = dt_boxes_corners_cam.reshape((-1, 3))
@@ -1790,7 +1791,7 @@ class KittiViewer(QMainWindow):
                 det_annos += self.inference_ctx.inference(inputs)
         self.info("total detection time:", time.time() - t)
         gt_annos = [i["annos"] for i in self.kitti_infos]
-        self.info(get_official_eval_result(gt_annos, det_annos, class_names))
+        # self.info(get_official_eval_result(gt_annos, det_annos, class_names))
 
     @staticmethod
     def get_simpify_labels(labels):
@@ -1823,7 +1824,8 @@ class KittiViewer(QMainWindow):
 
     @staticmethod
     def get_false_pos_neg(gt_boxes, dt_boxes, labels, fp_thresh=0.1):
-        iou = _riou3d_shapely(gt_boxes, dt_boxes)
+        # iou = _riou3d_shapely(gt_boxes, dt_boxes)
+        iou = 0
         ret = np.full([len(gt_boxes)], 2, dtype=np.int64)
         assigned_dt = np.zeros([len(dt_boxes)], dtype=np.bool_)
         label_thresh_map = {
