@@ -3,6 +3,10 @@
     "kitti_tracking_root": "/data/sets/kitti_tracking",
     "kitti_segmentation_root": "/data/sets/kitti_segmentation",
     "selected_split": "training",
+    "uncertainty": "detection",
+    "uncertainty_type": "identity",
+    "uncertainty_alpha": 0,
+    "uncertainty_beta": 0.01,
 
     "compare_results_detection": {
 
@@ -10,16 +14,12 @@
         "methods": [
 
             {
-                "name": "method1",
+                "name": "tanet",
+                "color": [0, 1.0, 0]
+            },
+            {
+                "name": "det-ab3d",
                 "color": [1.0, 0.0, 1.0]
-            },
-            {
-                "name": "method2",
-                "color": [1.0, 1.0, 0.0]
-            },
-            {
-                "name": "method3",
-                "color": [0.0, 0.0, 1.0]
             }
         ]
     },
@@ -31,12 +31,12 @@
         "methods": [
 
             {
-                "name": "model1",
-                "color": [0.0, 0.0, 1.0]
+                "name": "badvnn_tanet_car_s2",
+                "color": [0, 0, 1.0]
             },
             {
-                "name": "model2",
-                "color": [0.0, 1.0, 0.0]
+                "name": "tanet",
+                "color": [0, 1.0, 0]
             }
         ]
     },

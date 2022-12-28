@@ -1037,7 +1037,11 @@ class KittiViewer(QMainWindow):
             method_name = compare['method_name']
             difficulty = compare['difficulty']
 
-            gt_boxes_camera = box_np_ops.box_lidar_to_camera(boxes, rect, Trv2c)
+            if compare['has_uncertainty']:
+                gt_boxes_camera = boxes[0]
+            else:
+                gt_boxes_camera = box_np_ops.box_lidar_to_camera(boxes, rect, Trv2c)
+
             boxes_3d = box_np_ops.center_to_corner_box3d(
                 gt_boxes_camera[:, :3], gt_boxes_camera[:, 3:6], gt_boxes_camera[:, 6]
             )
@@ -1221,6 +1225,8 @@ class KittiViewer(QMainWindow):
             method_name = compare['method_name']
             difficulty = compare['difficulty']
 
+            has_uncertainty = compare['has_uncertainty']
+
             box_color = (color[0], color[1], color[2], self.w_config.get("GTBoxAlpha"))
             diff = difficulty.tolist()
             diff_to_name = {-1: "unk", 0: "easy", 1: "moderate", 2: "hard"}
@@ -1229,24 +1235,47 @@ class KittiViewer(QMainWindow):
             labels_ = [
                 f"{i}:{l}, {d}" for i, l, d in zip(label_idx, names, diff_names)
             ]
-            boxes_corners = box_np_ops.center_to_corner_box3d(
-                boxes[:, :3],
-                boxes[:, 3:6],
-                boxes[:, 6],
-                origin=[0.5, 0.5, 0],
-                axis=2,
-            )
 
-            self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
-            if self.w_config.get("DrawGTLabels"):
-                self.w_pc_viewer.labels(
-                    "gt_boxes/labels",
-                    boxes_corners[:, 0, :],
-                    labels_,
-                    GLColor.Green,
-                    15,
+            if has_uncertainty:
+
+                boxes_camera, covar, rect, Trv2c = boxes
+                print("covar", covar)
+                sampled_boxes_all = [
+                    np.random.multivariate_normal(box_camera, covar, 15)
+                    for box_camera in boxes_camera
+                ]
+
+                for i, sampled_boxes in enumerate(sampled_boxes_all):
+
+                    boxes = box_np_ops.box_camera_to_lidar(sampled_boxes, rect, Trv2c)
+                    boxes_corners = box_np_ops.center_to_corner_box3d(
+                        boxes[:, :3],
+                        boxes[:, 3:6],
+                        boxes[:, 6],
+                        origin=[0.5, 0.5, 0],
+                        axis=2,
+                    )
+
+                    self.w_pc_viewer.boxes3d("compare_boxes_" + method_name + "_" + str(i), boxes_corners, box_color, 3.0, 1.0)
+            else:
+
+                boxes_corners = box_np_ops.center_to_corner_box3d(
+                    boxes[:, :3],
+                    boxes[:, 3:6],
+                    boxes[:, 6],
+                    origin=[0.5, 0.5, 0],
+                    axis=2,
                 )
 
+                self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
+            # if self.w_config.get("DrawGTLabels"):
+            #     self.w_pc_viewer.labels(
+            #         "gt_boxes/labels",
+            #         boxes_corners[:, 0, :],
+            #         labels_,
+            #         GLColor.Green,
+            #         15,
+            #     )
 
     def plot_compare_tracking_boxes_in_pointcloud(self):
         if self.kitti_info is None:
@@ -1489,7 +1518,15 @@ class KittiViewer(QMainWindow):
                 difficulty = annos["difficulty"][:num_obj]
                 names = labels[:num_obj]
                 boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1)
-                boxes = box_np_ops.box_camera_to_lidar(boxes_camera, rect, Trv2c)
+
+                has_uncertainty = "covar" in annos
+
+                if has_uncertainty:
+                    covar = annos["covar"]
+                    boxes = (boxes_camera, covar, rect, Trv2c)
+                    print("has_uncertainty", boxes)
+                else:
+                    boxes = box_np_ops.box_camera_to_lidar(boxes_camera, rect, Trv2c)
 
                 self.kitti_info['compare'].append({
                     'difficulty': difficulty,
@@ -1497,6 +1534,7 @@ class KittiViewer(QMainWindow):
                     'boxes': boxes,
                     'color': method_color,
                     'method_name': method_name,
+                    'has_uncertainty': has_uncertainty
                 })
 
     def load_info_tracking(self, group_idx, image_idx):

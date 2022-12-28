@@ -18,6 +18,19 @@ detection_root = kitti_params['kitti_detection_root']
 tracking_root = kitti_params['kitti_tracking_root']
 segmentation_root = kitti_params['kitti_segmentation_root']
 
+detection_uncertainty = False
+tracking_uncertainty = None
+uncertainty_type = None
+uncertainty_alpha = None
+uncertainty_beta = None
+
+if 'uncertainty' in kitti_params:
+    detection_uncertainty = kitti_params['uncertainty'] == 'detection'
+    tracking_uncertainty = kitti_params['uncertainty'] == 'tracking'
+    uncertainty_type = kitti_params['uncertainty_type']
+    uncertainty_alpha = kitti_params['uncertainty_alpha']
+    uncertainty_beta = kitti_params['uncertainty_beta']
+
 if 'compare_results_detection' in kitti_params:
     compare_results_detection = kitti_params['compare_results_detection']
     compare_results_detection_methods = compare_results_detection['methods']
@@ -29,6 +42,9 @@ if 'compare_results_tracking' in kitti_params:
     compare_results_tracking_methods = compare_results_tracking['methods']
 else:
     compare_results_tracking = None
+
+print("compare_results_detection", compare_results_detection)
+print("compare_results_tracking", compare_results_tracking)
 
 detection_folders = kitti_params['folders']['detection']
 tracking_folders = kitti_params['folders']['tracking']
@@ -113,7 +129,7 @@ def get_kitti_tracking_files():
                     lambda a: local_path + '/' + a,
                     group_data[-1]
                 ))
-        
+
             result[categoty] = group_data
 
     return result
@@ -243,7 +259,8 @@ def get_compare_detection_annotation(method, index):
         lines = read_lines(file_name)
     
     label = get_label_anno(
-        lines
+        lines, uncertainty=detection_uncertainty, uncertainty_type=uncertainty_type, alpha=uncertainty_alpha,
+        beta=uncertainty_beta
     )
 
     return label
@@ -262,6 +279,8 @@ def get_compare_tracking_annotation(method, group, index):
             + selected_split + '/' + '{:04d}'.format(group) + '.txt'
         )
 
+        print("file_name", file_name)
+
         lines = []
 
         if os.path.exists(file_name):
@@ -279,9 +298,9 @@ def get_compare_tracking_annotation(method, group, index):
                     id, t, a1, a2, a3, a4,
                     b, c1, c2, c3, c4, c5, c6,
                     alpha, beta
-                ) = elements
+                ) = elements[:15]
 
-
+                print(b)
 
                 new_elements = [
                     type_by_number[int(t)],
@@ -319,3 +338,8 @@ def get_compare_tracking_annotation(method, group, index):
         return label
     else:
         raise ValueError("Unsupported tracking format: " + annotation_format)
+
+
+def sample_boxes_from_uncertainty(boxes, covar):
+    print("boxes, covar", boxes, covar)
+    return boxes

@@ -85,7 +85,7 @@ def get_class_to_label_map():
     return class_to_label
 
 
-def get_label_anno(lines):
+def get_label_anno(lines, uncertainty=False, uncertainty_type=None, alpha=None, beta=None):
     annotations = {}
     annotations.update({
         'name': [],
@@ -115,10 +115,24 @@ def get_label_anno(lines):
         [[float(info) for info in x[11:14]] for x in content]).reshape(-1, 3)
     annotations['rotation_y'] = np.array(
         [float(x[14]) for x in content]).reshape(-1)
-    if len(content) != 0 and len(content[0]) == 16:  # have score
+    if len(content) != 0 and len(content[0]) >= 16:  # has score
         annotations['score'] = np.array([float(x[15]) for x in content])
     else:
         annotations['score'] = np.zeros((annotations['bbox'].shape[0], ))
+    
+    if uncertainty:
+
+        covar = None
+
+        if uncertainty_type == 'identity':
+            covar = alpha + beta * np.eye(7)
+        elif uncertainty_type == 'covar':
+            covar = [alpha + beta * np.array([float(info) for info in x[16:]]).reshape(7, 7) for x in content]
+        elif uncertainty_type == 'var':
+            covar = [alpha + beta * np.diag([float(info) for info in x[16:]]).reshape(7, 7) for x in content]
+        
+        annotations['covar'] = covar
+
     index = list(range(num_objects)) + [-1] * (num_gt - num_objects)
     annotations['index'] = np.array(index, dtype=np.int32)
     annotations['group_ids'] = np.arange(num_gt, dtype=np.int32)
