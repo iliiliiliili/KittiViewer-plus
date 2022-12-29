@@ -124,14 +124,26 @@ def get_label_anno(lines, uncertainty=False, uncertainty_type=None, alpha=None, 
 
         covar = None
 
+        def covar_from_x(x):
+
+            if len(x) <= 17:
+                return np.eye(7) * 0
+            if len(x[16:]) == 49:
+                return np.array([float(info) for info in x[16:]]).reshape(7, 7)
+            if len(x[16:]) == 7:
+                return np.diag([float(info) for info in x[16:]]).reshape(7, 7)
+            
+            raise ValueError("No covar")
+
         if uncertainty_type == 'identity':
-            covar = alpha + beta * np.eye(7)
+            covar = [alpha + beta * np.eye(7) for x in content]
         elif uncertainty_type == 'covar':
-            covar = [alpha + beta * np.array([float(info) for info in x[16:]]).reshape(7, 7) for x in content]
+            covar = [alpha + beta * covar_from_x(x) for x in content]
         elif uncertainty_type == 'var':
-            covar = [alpha + beta * np.diag([float(info) for info in x[16:]]).reshape(7, 7) for x in content]
+            covar = [alpha + beta * covar_from_x(x) for x in content]
         
         annotations['covar'] = covar
+        print("covar", [a.shape for a in covar])
 
     index = list(range(num_objects)) + [-1] * (num_gt - num_objects)
     annotations['index'] = np.array(index, dtype=np.int32)

@@ -3,10 +3,10 @@
     "kitti_tracking_root": "/data/sets/kitti_tracking",
     "kitti_segmentation_root": "/data/sets/kitti_segmentation",
     "selected_split": "training",
-    "uncertainty": "detection",
-    "uncertainty_type": "identity",
-    "uncertainty_alpha": 0,
-    "uncertainty_beta": 0.01,
+    "uncertainty": "none",
+    "uncertainty_type": "covar",
+    "uncertainty_alpha": 0.6,
+    "uncertainty_beta": 5,
 
     "compare_results_detection": {
 

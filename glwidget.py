@@ -395,9 +395,13 @@ class KittiGLViewWidget(gl.GLViewWidget):
         azimuth = self.opts['azimuth'] / 180 * np.pi
         distance = self.opts['distance']
         R, T = get_RT_(elevation, azimuth, distance, center)
-        dx_world = np.linalg.inv(R) @ (xp)
-        dy_world = np.linalg.inv(R) @ (yp)
-        dz_world = np.linalg.inv(R) @ (zp)
+        # dx_world = np.linalg.inv(R) @ (xp)
+        # dy_world = np.linalg.inv(R) @ (yp)
+        # dz_world = np.linalg.inv(R) @ (zp)
+        
+        dx_world = np.array(xp)
+        dy_world = np.array(yp)
+        dz_world = np.array(zp)
         # print(dx_world)
         return self.world_move(*(dx_world + dy_world + dz_world))
 

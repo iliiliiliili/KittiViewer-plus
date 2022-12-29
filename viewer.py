@@ -55,7 +55,7 @@ import second.core.preprocess as prep
 import control_panel as panel
 from second.core.anchor_generator import AnchorGeneratorStride
 from second.core.box_coders import GroundBox3dCoder
-from second.core.point_cloud.point_cloud_ops import points_to_voxel
+from second.core.point_cloud.point_cloud_ops import points_to_voxel, voxel_counting_map
 from second.core.region_similarity import (
     DistanceSimilarity,
     NearestIouSimilarity,
@@ -530,6 +530,54 @@ class KittiPointCloudView(KittiGLViewWidget):
                 colors = np.zeros((0, 4))
         self.boxes3d("voxels", voxel_box_corners, colors)
 
+    def draw_voxel_samples(self, sampled_boxes, name, voxel_size=np.array([0.16,0.16,0.16]) * 2, outer_scale=1):  # sampled_boxes = [mean_box, ...]; box = [xyzlhwr] in lidar
+        pos_color = self.w_config.get("PosVoxelColor")[:3]
+        pos_color = np.array([*pos_color, self.w_config.get("PosVoxelAlpha")])
+        neg_color = self.w_config.get("NegVoxelColor")[:3]
+        neg_color = np.array([*neg_color, 0.01])
+
+        mean_box = sampled_boxes[0]
+        mean_box_size = mean_box[3:6]
+        box_size = np.array([np.max(mean_box_size)] * 3)
+
+        grid_size = np.array(box_size / voxel_size * (1 + outer_scale))
+        grid_size = np.round(grid_size).astype(np.int64)
+
+        shift = mean_box[:3] - voxel_size * (grid_size / 2)
+
+        voxels = voxel_counting_map(voxel_size, shift, grid_size)
+        
+        boxes_corners = box_np_ops.center_to_corner_box3d(
+            sampled_boxes[:, :3],
+            sampled_boxes[:, 3:6],
+            sampled_boxes[:, 6],
+            origin=[0.5, 0.5, 0],
+            axis=2,
+        )
+
+        box_np_ops.add_count_voxels_in_box(voxels, voxel_size, boxes_corners)
+
+        total = np.max(voxels[..., 3])
+        voxels[..., 3] /= total
+        flat_voxels = voxels.reshape(-1, 4)
+        flat_voxels = flat_voxels[flat_voxels[:, 3] > 0]
+
+        voxel_centers = flat_voxels[:, :3] + voxel_size / 2
+        voxel_mins = flat_voxels[:, :3] + voxel_size / 4
+        voxel_maxs = voxel_mins + voxel_size / 2
+        voxel_boxes = np.concatenate([voxel_mins, voxel_maxs], axis=1)
+        voxel_box_corners = box_np_ops.minmax_to_corner_3d(voxel_boxes)
+
+        colors_neg = np.zeros([voxel_box_corners.shape[0], 4])
+        colors_pos = np.zeros([voxel_box_corners.shape[0], 4])
+        colors = np.zeros([voxel_box_corners.shape[0], 4])
+        colors_neg[:] = neg_color
+        colors_pos[:] = pos_color
+        colors[:] = colors_pos * flat_voxels[:, 3:4] + colors_neg * (1 - flat_voxels[:, 3:4])
+        sizes = flat_voxels[:, 3:4].reshape(-1, 1) * 0.5
+        print("sizes.shape", sizes.shape)
+        # self.boxes3d("voxels_" + name, voxel_box_corners, colors, width=15.0)
+        self.scatter("voxels_" + name, voxel_centers, colors, size=0.4)
 
 class KittiViewer(QMainWindow):
     def __init__(self):
@@ -580,6 +628,8 @@ class KittiViewer(QMainWindow):
         if config != "":
             self.w_config.loads(config)
         self.w_config.configChanged.connect(self.on_configchanged)
+        self.config_btn = QPushButton("Options")
+        self.config_btn.clicked.connect(self.on_panel_clicked)
         self.w_plot = QPushButton("plot")
         self.w_plot.clicked.connect(self.on_plotButtonPressed)
 
@@ -655,6 +705,7 @@ class KittiViewer(QMainWindow):
 
         self.w_config_gbox_segmentation.setLayout(layout_segmentation)
 
+        control_panel_layout.addWidget(self.config_btn)
         control_panel_layout.addWidget(self.w_config_gbox)
         control_panel_layout.addWidget(self.w_config_gbox_tracking)
         control_panel_layout.addWidget(self.w_config_gbox_segmentation)
@@ -665,6 +716,7 @@ class KittiViewer(QMainWindow):
         control_panel_layout.setStretch(0, 1)
         control_panel_layout.setStretch(1, 1)
         control_panel_layout.setStretch(2, 1)
+        control_panel_layout.setStretch(3, 1)
         self.center_layout = QHBoxLayout()
 
         self.w_pc_viewer = KittiPointCloudView(
@@ -1074,7 +1126,11 @@ class KittiViewer(QMainWindow):
             method_name = compare['method_name']
             difficulty = compare['difficulty']
 
-            gt_boxes_camera = box_np_ops.box_lidar_to_camera(boxes, rect, Trv2c)
+            if compare['has_uncertainty']:
+                gt_boxes_camera = boxes[0]
+            else:
+                gt_boxes_camera = box_np_ops.box_lidar_to_camera(boxes, rect, Trv2c)
+
             boxes_3d = box_np_ops.center_to_corner_box3d(
                 gt_boxes_camera[:, :3], gt_boxes_camera[:, 3:6], gt_boxes_camera[:, 6]
             )
@@ -1241,22 +1297,37 @@ class KittiViewer(QMainWindow):
                 boxes_camera, covar, rect, Trv2c = boxes
                 print("covar", covar)
                 sampled_boxes_all = [
-                    np.random.multivariate_normal(box_camera, covar, 15)
+                    np.array([
+                        box_camera, 
+                        *[
+                            a[[0,1,2,4,6,5,3]] for a in
+                            np.random.multivariate_normal(box_camera[[0,1,2,6,3,5,4]], covar, 100)  # box_camera = xyzlhwr; covar=xyzrlwh
+                        ]
+                    ])
                     for box_camera in boxes_camera
                 ]
 
-                for i, sampled_boxes in enumerate(sampled_boxes_all):
+                for sampled_boxes in sampled_boxes_all:
+                    print("sampled_boxes", sampled_boxes.shape)
 
-                    boxes = box_np_ops.box_camera_to_lidar(sampled_boxes, rect, Trv2c)
-                    boxes_corners = box_np_ops.center_to_corner_box3d(
-                        boxes[:, :3],
-                        boxes[:, 3:6],
-                        boxes[:, 6],
-                        origin=[0.5, 0.5, 0],
-                        axis=2,
-                    )
+                sampled_boxes_lidar_all = np.array([
+                    box_np_ops.box_camera_to_lidar(sampled_boxes, rect, Trv2c)
+                    for sampled_boxes in sampled_boxes_all
+                ])
 
-                    self.w_pc_viewer.boxes3d("compare_boxes_" + method_name + "_" + str(i), boxes_corners, box_color, 3.0, 1.0)
+                for i, sampled_boxes in enumerate(sampled_boxes_lidar_all):
+                    self.w_pc_viewer.draw_voxel_samples(sampled_boxes, name="compare_boxes_" + method_name + "_" + str(i))
+
+                boxes = sampled_boxes_lidar_all[:, 0]
+                boxes_corners = box_np_ops.center_to_corner_box3d(
+                    boxes[:, :3],
+                    boxes[:, 3:6],
+                    boxes[:, 6],
+                    origin=[0.5, 0.5, 0],
+                    axis=2,
+                )
+
+                self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
             else:
 
                 boxes_corners = box_np_ops.center_to_corner_box3d(
@@ -1293,6 +1364,8 @@ class KittiViewer(QMainWindow):
             method_name = compare['method_name']
             difficulty = compare['difficulty']
 
+            has_uncertainty = compare['has_uncertainty']
+
             box_color = (color[0], color[1], color[2], self.w_config.get("GTBoxAlpha"))
             diff = difficulty.tolist()
             diff_to_name = {-1: "unk", 0: "easy", 1: "moderate", 2: "hard"}
@@ -1301,23 +1374,61 @@ class KittiViewer(QMainWindow):
             labels_ = [
                 f"{i}:{l}, {d}" for i, l, d in zip(label_idx, names, diff_names)
             ]
-            boxes_corners = box_np_ops.center_to_corner_box3d(
-                boxes[:, :3],
-                boxes[:, 3:6],
-                boxes[:, 6],
-                origin=[0.5, 0.5, 0],
-                axis=2,
-            )
+            if has_uncertainty:
 
-            self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
-            if self.w_config.get("DrawGTLabels"):
-                self.w_pc_viewer.labels(
-                    "gt_boxes/labels",
-                    boxes_corners[:, 0, :],
-                    labels_,
-                    GLColor.Green,
-                    15,
+                boxes_camera, covars, rect, Trv2c = boxes
+                print("covar", covars)
+                sampled_boxes_all = [
+                    np.array([
+                        box_camera, 
+                        *[
+                            a[[0,1,2,4,6,5,3]] for a in
+                            np.random.multivariate_normal(box_camera[[0,1,2,6,3,5,4]], covar, 100)  # box_camera = xyzlhwr; covar=xyzrlwh
+                        ]
+                    ])
+                    for box_camera, covar in zip(boxes_camera, covars)
+                ]
+
+                for sampled_boxes in sampled_boxes_all:
+                    print("sampled_boxes", sampled_boxes.shape)
+
+                sampled_boxes_lidar_all = np.array([
+                    box_np_ops.box_camera_to_lidar(sampled_boxes, rect, Trv2c)
+                    for sampled_boxes in sampled_boxes_all
+                ])
+
+                for i, sampled_boxes in enumerate(sampled_boxes_lidar_all):
+                    self.w_pc_viewer.draw_voxel_samples(sampled_boxes, name="compare_boxes_" + method_name + "_" + str(i))
+
+                boxes = sampled_boxes_lidar_all[:, 0]
+                boxes_corners = box_np_ops.center_to_corner_box3d(
+                    boxes[:, :3],
+                    boxes[:, 3:6],
+                    boxes[:, 6],
+                    origin=[0.5, 0.5, 0],
+                    axis=2,
                 )
+
+                self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
+            else:
+
+                boxes_corners = box_np_ops.center_to_corner_box3d(
+                    boxes[:, :3],
+                    boxes[:, 3:6],
+                    boxes[:, 6],
+                    origin=[0.5, 0.5, 0],
+                    axis=2,
+                )
+
+                self.w_pc_viewer.boxes3d("compare_boxes_" + method_name, boxes_corners, box_color, 3.0, 1.0)
+                if self.w_config.get("DrawGTLabels"):
+                    self.w_pc_viewer.labels(
+                        "gt_boxes/labels",
+                        boxes_corners[:, 0, :],
+                        labels_,
+                        GLColor.Green,
+                        15,
+                    )
 
     def plot_pointcloud(self):
         if self.kitti_info is None:
@@ -1364,6 +1475,7 @@ class KittiViewer(QMainWindow):
                     [point_color[:, :3], self.points[:, 3:4] * 0.8 + 0.2], axis=1
                 )
 
+        print("point_size.shape", point_size.shape)
         self.w_pc_viewer.scatter(
             "pointcloud", self.points[:, :3], point_color, size=point_size
         )
@@ -1626,7 +1738,14 @@ class KittiViewer(QMainWindow):
                 difficulty = annos["difficulty"][:num_obj]
                 names = labels[:num_obj]
                 boxes_camera = np.concatenate([loc, dims, rots[..., np.newaxis]], axis=1)
-                boxes = box_np_ops.box_camera_to_lidar(boxes_camera, rect, Trv2c)
+                has_uncertainty = "covar" in annos
+
+                if has_uncertainty:
+                    covar = annos["covar"]
+                    boxes = (boxes_camera, covar, rect, Trv2c)
+                    print("has_uncertainty", boxes)
+                else:
+                    boxes = box_np_ops.box_camera_to_lidar(boxes_camera, rect, Trv2c)
 
                 self.kitti_info['compare'].append({
                     'difficulty': difficulty,
@@ -1634,6 +1753,7 @@ class KittiViewer(QMainWindow):
                     'boxes': boxes,
                     'color': method_color,
                     'method_name': method_name,
+                    'has_uncertainty': has_uncertainty
                 })
 
     def load_info_segmentation(self, image_idx):
@@ -1890,7 +2010,47 @@ class KittiViewer(QMainWindow):
         return ret, assigned_dt
 
 
+def test():
+
+    # sampled_boxes = np.[mean_box, ...]; box = [xyzlhwr] in lidar
+
+    grid_scale=10
+    outer_scale=1
+
+    sampled_boxes=np.array([
+        np.array([10, 12, 1.5, 2, 1, 1, np.pi/4]),
+        np.array([10, 12, 1.5, 3, 1, 1, np.pi/4]),
+    ])
+
+    mean_box = sampled_boxes[0]
+    mean_box_size = mean_box[3:6]
+    voxel_size = mean_box_size / grid_scale
+
+    grid_size = np.array([grid_scale * (1 + outer_scale)] * 3)
+    grid_size = np.round(grid_size).astype(np.int64)
+
+    shift = mean_box[:3] - voxel_size * (grid_scale * (1 + outer_scale) / 2)
+
+    voxels = voxel_counting_map(voxel_size, shift, grid_size)
+    
+    boxes_corners = box_np_ops.center_to_corner_box3d(
+        sampled_boxes[:, :3],
+        sampled_boxes[:, 3:6],
+        sampled_boxes[:, 6],
+        origin=[0.5, 0.5, 0],
+        axis=2,
+    )
+
+    box_np_ops.add_count_voxels_in_box(voxels, voxel_size, boxes_corners)
+
+    total = np.sum(voxels[..., 3])
+    voxels[..., 3] /= total
+
+    print()
+
+
 if __name__ == "__main__":
+    test()
     app = QApplication(sys.argv)
     ex = KittiViewer()
     sys.exit(app.exec_())

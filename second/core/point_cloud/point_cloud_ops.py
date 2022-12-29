@@ -183,3 +183,26 @@ def bound_points_jit(points, upper_bound, lower_bound):
                 break
         keep_indices[i] = success
     return keep_indices
+
+
+
+def voxel_counting_map(size, offset, count):
+    voxels = np.zeros(
+        shape=(*count, 4), dtype=np.float32
+    )
+
+    @numba.jit
+    def create(voxels, size_x, size_y, size_z, offset_x, offset_y, offset_z, count_x, count_y, count_z):
+        for x in range(count_x):
+            for y in range(count_y):
+                for z in range(count_z):
+                    voxels[x,y,z,0] = offset_x + size_x * x 
+                    voxels[x,y,z,1] = offset_y + size_y * y 
+                    voxels[x,y,z,2] = offset_z + size_z * z
+
+        return voxels
+    
+    result = create(voxels, *size, *offset, *count)
+
+    return result
+

@@ -865,3 +865,14 @@ def change_box3d_center_(box3d, src, dst):
     dst = np.array(dst, dtype=box3d.dtype)
     src = np.array(src, dtype=box3d.dtype)
     box3d[..., :3] += box3d[..., 3:6] * (dst - src)
+
+
+def add_count_voxels_in_box(voxels, voxel_size, boxes_corners):
+    flat_voxels = voxels.reshape(-1, 4)
+    surfaces = corner_to_surfaces_3d(boxes_corners)
+    contains = points_in_convex_polygon_3d_jit(flat_voxels[:, :3] + voxel_size / 2, surfaces)
+    counts = np.sum(contains, axis=1)
+
+    flat_voxels[:, 3] += counts
+
+    return flat_voxels.reshape(voxels.shape)

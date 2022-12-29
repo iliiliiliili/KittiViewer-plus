@@ -300,7 +300,10 @@ def get_compare_tracking_annotation(method, group, index):
                     alpha, beta
                 ) = elements[:15]
 
-                print(b)
+                covvar = []
+
+                if len(elements) > 15:
+                    covvar = elements[15:]
 
                 new_elements = [
                     type_by_number[int(t)],
@@ -318,7 +321,8 @@ def get_compare_tracking_annotation(method, group, index):
                     c5,
                     c6,
                     alpha,
-                    b
+                    b,
+                    *covvar
                 ]
 
                 new_line = " ".join([str(a) for a in new_elements])
@@ -332,7 +336,8 @@ def get_compare_tracking_annotation(method, group, index):
             lines = selected_lines
 
         label = get_label_anno(
-            lines
+            lines, uncertainty=tracking_uncertainty, uncertainty_type=uncertainty_type, alpha=uncertainty_alpha,
+            beta=uncertainty_beta
         )
 
         return label
